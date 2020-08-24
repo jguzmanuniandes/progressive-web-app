@@ -1,6 +1,59 @@
 (function () {
     'use strict';
 
+    //INDEXEDDB
+    var indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+    var dataBase = null;
+    var arrayKeys = [];
+        
+    function startDB() {
+    
+        dataBase = indexedDB.open("Schedules", 1);
+        
+        dataBase.onupgradeneeded = function (e) {
+            let active = dataBase.result;
+            let object = active.createObjectStore("schedule", { keyPath : 'id', autoIncrement : true });
+        };
+
+        dataBase.onsuccess = function (e) {
+            console.log('Base de datos cargada correctamente');
+        };
+
+        dataBase.onerror = function (e)  {
+            alert('Error cargando la base de datos');
+        };
+    }
+
+    startDB();
+
+    function saveData(key, label) {
+        var active = dataBase.result;
+        const transaction = active.transaction('schedule', 'readwrite');
+        const store = transaction.objectStore('schedule');
+
+        store.add({key, label})
+	    transaction.onerror = ev => {
+	        console.error('¡Se ha producido un error!', ev.target.error.message);
+	    }
+    }
+
+    function getScheduleKeys() {
+        var active = dataBase.result;
+        const transaction = active.transaction('schedule', 'readwrite');
+        const store = transaction.objectStore('schedule');
+
+        store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+              arrayKeys.push({key: cursor.value.key, label: cursor.value.label});
+              cursor.continue();
+            } else {
+              console.log("No more entries!");
+            }
+          };
+        return arrayKeys;
+    }
+
     var app = {
         isLoading: true,
         visibleCards: {},
@@ -30,7 +83,6 @@
 
     document.getElementById('butAddCity').addEventListener('click', function () {
 
-
         var select = document.getElementById('selectTimetableToAdd');
         var selected = select.options[select.selectedIndex];
         var key = selected.value;
@@ -38,7 +90,8 @@
         if (!app.selectedTimetables) {
             app.selectedTimetables = [];
         }
-        app.getScheduleFromCache(key, label);
+        //app.getScheduleFromCache(key, label); //service worker is already doing this job
+        saveData(key, label);
         app.getSchedule(key, label);
         app.selectedTimetables.push({key: key, label: label});
         app.toggleAddDialog(false);
@@ -115,8 +168,7 @@
         if (!('caches' in window)) {
           return null;
         }
-        const url = `${window.location.origin}/${key}`;
-
+        const url = 'https://api-ratp.pierre-grimaud.fr/v3/schedules/' + key;
         console.log(url);
 
         return caches.match(url)
@@ -130,6 +182,8 @@
                     result.schedules = cacheResponse.result.schedules;
                     app.updateTimetableCard(result);
                     console.log("Updating from cache")
+                }else {
+                    console.log("There is no answer from cache")
                 }
                 return null;
             })
@@ -154,8 +208,6 @@
                     result.created = response._metadata.date;
                     result.schedules = response.result.schedules;
                     app.updateTimetableCard(result);
-                    
-                    console.log('Updating from network')
                 }
             } else {
                 // Return the initial weather forecast since no data is available.
@@ -168,9 +220,11 @@
 
     // Iterate all of the cards and attempt to get the latest timetable data
     app.updateSchedules = function () {
-        var keys = Object.keys(app.visibleCards);
-        keys.forEach(function (key) {
-            app.getSchedule(key);
+        //var keys = Object.keys(app.visibleCards);
+        var keys = getScheduleKeys();
+        //console.log(keys)
+        keys.forEach(function (element) {
+            app.getSchedule(element.key, element.label);
         });
     };
 
@@ -216,4 +270,5 @@
     app.selectedTimetables = [
         {key: initialStationTimetable.key, label: initialStationTimetable.label}
     ];
+
 })();
