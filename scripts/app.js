@@ -38,6 +38,7 @@
         if (!app.selectedTimetables) {
             app.selectedTimetables = [];
         }
+        app.getScheduleFromCache(key, label);
         app.getSchedule(key, label);
         app.selectedTimetables.push({key: key, label: label});
         app.toggleAddDialog(false);
@@ -109,6 +110,35 @@
      *
      ****************************************************************************/
 
+    app.getScheduleFromCache = function (key, label) {
+
+        if (!('caches' in window)) {
+          return null;
+        }
+        const url = `${window.location.origin}/${key}`;
+
+        console.log(url);
+
+        return caches.match(url)
+            .then((response) => {
+                if (response) {
+                    let cacheResponse = response.json();
+                    let result = {};
+                    result.key = key;
+                    result.label = label;
+                    result.created = cacheResponse._metadata.date;
+                    result.schedules = cacheResponse.result.schedules;
+                    app.updateTimetableCard(result);
+                    console.log("Updating from cache")
+                }
+                return null;
+            })
+            .catch((err) => {
+                console.error('Error getting data from cache', err);
+                return null;
+            });
+    };
+
 
     app.getSchedule = function (key, label) {
         var url = 'https://api-ratp.pierre-grimaud.fr/v3/schedules/' + key;
@@ -124,6 +154,8 @@
                     result.created = response._metadata.date;
                     result.schedules = response.result.schedules;
                     app.updateTimetableCard(result);
+                    
+                    console.log('Updating from network')
                 }
             } else {
                 // Return the initial weather forecast since no data is available.
