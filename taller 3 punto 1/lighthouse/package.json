@@ -1,0 +1,12 @@
+{
+  "name": "ratp-lighthouse-recipe",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {},
+  "author": "Jhonatan Guzman",
+  "license": "ISC",
+  "devDependencies": {
+    "lighthouse": "^6.3.0"
+  }
+}
